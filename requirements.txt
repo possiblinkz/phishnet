@@ -47,13 +47,12 @@ bcrypt==5.0.0
 beautifulsoup4==4.14.3
 bidict==0.23.1
 billiard==4.2.4
-binwalk==2.4.3
+binwalk==2.1.0
 bitstruct==8.21.0
 bleach==6.3.0
 blinker==1.9.0
 bottle==0.13.2
 Bottleneck==1.4.2
-Brlapi==0.8.7
 Brotli==1.1.0
 browser-cookie3==0.20.1
 capstone==5.0.6
