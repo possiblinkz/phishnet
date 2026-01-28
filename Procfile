@@ -1,1 +1,1 @@
-web: python  phishnet.py
+web: python  app.py
